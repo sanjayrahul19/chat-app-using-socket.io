@@ -1,8 +1,12 @@
 import { Server } from "socket.io";
 import { addContact } from "./add-contact";
 import {
+  addAdmin,
+  addMembers,
   blocked,
+  createGroup,
   deliveredMessage,
+  groupMessage,
   message,
   offlineEvents,
   offlineMessage,
@@ -43,6 +47,10 @@ export const socket = (server) => {
     socket.on("unblock", unblock);
     socket.on("deliveredMessage", deliveredMessage);
     socket.on("seenMessage", seenMessage);
+    socket.on("createGroup", createGroup);
+    socket.on("addMembers", addMembers);
+    socket.on("addAdmin", addAdmin);
+    socket.on("groupMessage", groupMessage);
 
     offlineMessage(socket.handshake.query.id);
     offlineEvents(socket.handshake.query.id);
@@ -57,7 +65,6 @@ export const socket = (server) => {
 };
 
 export const emitToSocket = async (id, event, data) => {
-
   const find = details.filter((item) => {
     return item.userId === id;
   });
@@ -73,8 +80,9 @@ export const emitToSocket = async (id, event, data) => {
   console.log("Found client:", details);
 
   if (find.length > 0) {
-    console.log(find.length, "LENGTH====")
     for (let i = 0; i < find.length; i++) {
+      console.log(find[i].userId, "===userId");
+      console.log(find[i].clientId, "===clientId");
       io.to(find[i].clientId).emit(event, data);
     }
     console.log("Emitting event:", event, data);

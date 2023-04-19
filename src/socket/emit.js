@@ -3,6 +3,8 @@ import { Chat } from "../model/chat";
 import { User } from "../model/user";
 import { Offline } from "../model/offline";
 import moment from "moment";
+import { Group } from "../model/group";
+import { GroupMessage } from "../model/groupMessage";
 
 export const message = async (data) => {
   const sender = await User.findById(data.sender);
@@ -69,6 +71,7 @@ export const onlineStatus = async (id) => {
       status: "Online",
     });
   }
+
   await User.findByIdAndUpdate(
     { _id: id },
     { onlineStatus: "online" },
@@ -117,4 +120,69 @@ export const unblock = async (data) => {
     );
   }
   emitToSocket(data.sender, "unblock", "User unblocked successfully");
+};
+
+export const createGroup = async (data) => {
+  const user = await Group.create({
+    group_name: data.group_name,
+    group_admin: data.group_admin,
+    members: data.members,
+  });
+  const len = data.members;
+  for (let i = 0; i < len.length; i++) {
+    await emitToSocket(data.members[i], "createGroup", user);
+  }
+};
+
+export const addMembers = async (data) => {
+  let users;
+  const group = await Group.findById(data.groupId);
+  if (group.group_admin.includes(data.groupAdmin)) {
+    for (let i = 0; i < data.members.length; i++) {
+      const member = data.members[i];
+      if (!group.members.includes(member)) {
+        const user = await Group.findByIdAndUpdate(
+          data.groupId,
+          { $push: { members: member } },
+          { new: true }
+        );
+        users = user.members;
+      }
+    }
+    for (let j = 0; j < users.length; j++) {
+      await emitToSocket(users[j].toString(), "addMembers", data);
+    }
+  }
+};
+
+export const addAdmin = async (data) => {
+  const user = await Group.findById(data.groupId);
+  const members = user.members;
+  const admin = user.group_admin;
+  if (!admin.includes(data.admin)) {
+    const users = await Group.findByIdAndUpdate(
+      data.groupId,
+      { $push: { group_admin: data.admin } },
+      { new: true }
+    );
+  }
+  for (let i = 0; i < members.length; i++) {
+    emitToSocket(members[i].toString(), "addAdmin", data);
+  }
+};
+
+export const groupMessage = async (data) => {
+  const message = await GroupMessage.create({
+    groupId: data.groupId,
+    sender: data.senderId,
+    receiver: data.receiver,
+    messageType: data.messageType,
+    message: data.message,
+  });
+  const receiver = data.receiver;
+  for (let i = 0; i < receiver.length; i++) {
+    await emitToSocket(receiver[i], "groupMessage", data);
+    const remove = receiver.pop(receiver[i]);
+    console.log(remove, "removeeee");
+  }
 };
