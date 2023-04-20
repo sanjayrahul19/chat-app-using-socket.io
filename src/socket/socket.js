@@ -12,10 +12,14 @@ import {
   offlineMessage,
   offlineStatus,
   onlineStatus,
+  removeFromGroup,
+  seenGroupMessage,
   seenMessage,
   unblock,
+  unseenGroupMessage,
 } from "./emit";
 import { Offline } from "../model/offline";
+import { GroupMessage } from "../model/groupMessage";
 
 let details = [];
 let io = null;
@@ -51,10 +55,13 @@ export const socket = (server) => {
     socket.on("addMembers", addMembers);
     socket.on("addAdmin", addAdmin);
     socket.on("groupMessage", groupMessage);
+    socket.on("removeFromGroup", removeFromGroup);
+    socket.on("seenGroupMessage", seenGroupMessage);
 
     offlineMessage(socket.handshake.query.id);
     offlineEvents(socket.handshake.query.id);
     onlineStatus(socket.handshake.query.id);
+    unseenGroupMessage(socket.handshake.query.id);
 
     socket.on("disconnect", async () => {
       await offlineStatus(socket.handshake.query.id);
@@ -87,6 +94,11 @@ export const emitToSocket = async (id, event, data) => {
     }
     console.log("Emitting event:", event, data);
   } else {
+    const user = await GroupMessage.findByIdAndUpdate(
+      data._id,
+      { $push: { unseen: id } },
+      { new: true }
+    );
     console.log("No matching client found for receiver:", id);
   }
 };
