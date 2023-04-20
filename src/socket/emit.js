@@ -96,6 +96,60 @@ export const offlineStatus = async (id) => {
   );
 };
 
+export const unseenGroupMessage = async (id) => {
+  const user = await GroupMessage.find({ unseen: id });
+  await emitToSocket(id, "unseenGroupMessage", user);
+  await GroupMessage.updateMany(
+    { unseen: id },
+    { $pull: { unseen: id } },
+    { new: true }
+  );
+  const afterUpdation = await GroupMessage.find();
+  for (let i = 0; i < afterUpdation.length; i++) {
+    if (afterUpdation[i].unseen.length === 0) {
+      await GroupMessage.findByIdAndUpdate(
+        afterUpdation[i]._id,
+        { status: 2 },
+        { new: true }
+      );
+    }
+  }
+};
+
+export const seenGroupMessage = async (data) => {
+  const user = await GroupMessage.updateMany(
+    { groupId: data.groupId },
+    { $push: { seen: data.groupMember } },
+    { new: true }
+  );
+  await emitToSocket(data.groupMember, "seenGroupMessage", data);
+  const group = await GroupMessage.find({ groupId: data.groupId });
+  for (let i = 0; i < group.length; i++) {
+    if (group[i].receiver.length === group[i].seen.length) {
+      await GroupMessage.findByIdAndUpdate(
+        group[i]._id,
+        { status: 3 },
+        { new: true }
+      );
+    }
+  }
+};
+
+export const removeFromGroup = async (data) => {
+  const group = await Group.findById(data.groupId);
+  if (group.group_admin.includes(data.groupAdmin)) {
+    const remove = await Group.findByIdAndUpdate(
+      data.groupId,
+      { $pull: { members: data.groupMember } },
+      { new: true }
+    );
+  }
+  const members = group.members;
+  for (let i = 0; i < members.length; i++) {
+    await emitToSocket(group.members[i].toString(), "removeFromGroup", data);
+  }
+};
+
 export const blocked = async (data) => {
   const sender = await User.findById(data.sender);
   const blocked = sender.blocked;
@@ -180,9 +234,8 @@ export const groupMessage = async (data) => {
     message: data.message,
   });
   const receiver = data.receiver;
+
   for (let i = 0; i < receiver.length; i++) {
-    await emitToSocket(receiver[i], "groupMessage", data);
-    const remove = receiver.pop(receiver[i]);
-    console.log(remove, "removeeee");
+    await emitToSocket(receiver[i], "groupMessage", message);
   }
 };

@@ -16,6 +16,18 @@ const groupMessageSchema = new mongoose.Schema(
         ref: "user",
       },
     ],
+    unseen: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "user",
+      },
+    ],
+    seen: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "user",
+      },
+    ],
     messageType: {
       type: String,
     },
@@ -24,7 +36,7 @@ const groupMessageSchema = new mongoose.Schema(
     },
     status: {
       type: Number,
-      enum: [1, 2],
+      enum: [1, 2, 3],
       default: 1,
     },
   },
