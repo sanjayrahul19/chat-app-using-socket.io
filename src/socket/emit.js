@@ -5,6 +5,7 @@ import { Offline } from "../model/offline";
 import moment from "moment";
 import { Group } from "../model/group";
 import { GroupMessage } from "../model/groupMessage";
+import FCM from "fcm-node";
 
 export const message = async (data) => {
   const sender = await User.findById(data.sender);
@@ -18,6 +19,7 @@ export const message = async (data) => {
       message: data.message,
       message_type: data.message_type,
     });
+
     emitToSocket(data.sender, "message", data.message);
   } else {
     const chat = await Chat.create({
@@ -26,6 +28,7 @@ export const message = async (data) => {
       message: data.message,
       message_type: data.message_type,
     });
+    await notification(data);
     emitToSocket(data.sender, "message", data.message);
     emitToSocket(data.receiver, "message", data.message);
   }
@@ -117,11 +120,13 @@ export const unseenGroupMessage = async (id) => {
 };
 
 export const seenGroupMessage = async (data) => {
+  console.log(data.groupId, "groupid");
   const user = await GroupMessage.updateMany(
     { groupId: data.groupId },
     { $push: { seen: data.groupMember } },
     { new: true }
   );
+  console.log(user, "userrrrr");
   await emitToSocket(data.groupMember, "seenGroupMessage", data);
   const group = await GroupMessage.find({ groupId: data.groupId });
   for (let i = 0; i < group.length; i++) {
@@ -238,4 +243,29 @@ export const groupMessage = async (data) => {
   for (let i = 0; i < receiver.length; i++) {
     await emitToSocket(receiver[i], "groupMessage", message);
   }
+};
+
+const notification = (data) => {
+  let serverKey =
+    "BJJmbhlStAAlmsmf1-qr3q85s2VNYGaCmLISQZFBKZ6ZcFE1-Zc3dI_0d_ByBIZlM2a2dykPsiYW4YZoNt5VG5o";
+  let fcm = new FCM(serverKey);
+  console.log(fcm, "fcm");
+
+  let message = {
+    to: "ef0ZJbZZRhmzotdAQNKaZ1:APA91bETEaxLPoR6xBf6QVnoRhdbLtgJ61PEpt5vrKsQ8xrFxF1SV5i1W0RXqjUzgo1mGOnszzu3qIdsKkL0XCTUIJniQUk0kUDj3L1Npt944edzvAf7TAwMe5bSJ4D_HcdR0Ny9woxa",
+    content_available: true,
+    priority: "high",
+    notification: {
+      title: "Chat app",
+      body: data.message,
+    },
+  };
+  console.log(message, "kkkkkkkkkkkkkk");
+  fcm.send(message, function (err, response) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("Successfully sent with response: ", response);
+    }
+  });
 };
